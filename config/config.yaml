@@ -1,0 +1,17 @@
+dataCode: example
+
+sampleKey: "example/sampleKey.txt"
+
+interaction: True
+interaction_name:
+    - 'case_control_other_latest'
+    #- 'neutrophils_percent_z'
+    #- 'visit_month'
+
+countMatrixRData: "example/genes_tpm.rds"
+metadataRData: "example/metadata.txt"
+
+VCF: "example/genotypes.vcf.gz"
+GTF: "ref/gencode.v29.annotation.gtf.gz"
+
+mode: "eQTL"

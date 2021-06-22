@@ -1,0 +1,263 @@
+import os
+import glob
+import yaml
+import pathlib
+import pandas as pd
+from snakemake.io import *
+
+###################################################################################################
+## Define global variables
+###################################################################################################
+# Some hardcoded stuff for now
+R_VERSION = "R/4.0.3"
+cisDist = 100000 # max distance from TSS to look for SNPs
+NUM_CHUNK = 40
+chunks = [str(x) for x in range(1,NUM_CHUNK+1)]
+
+# Set snakemake main workdir variable. 
+SNAKEDIR = os.path.dirname(workflow.snakefile) + "/"
+
+#shell.prefix('ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate QTL-pipeline; ml {R_VERSION};')
+
+dataCode = config["dataCode"]
+mode = config["mode"]
+sample_key = config["sampleKey"]
+
+GTF = config["GTF"]
+VCF = config["VCF"]
+VCFstem = VCF.split(".vcf.gz")[0]
+
+metadataRData = config["metadataRData"]
+countMatrixRData = config["countMatrixRData"]
+
+# Interaction QTLs
+# interaction mode - set default to False
+if "interaction" not in config.keys():
+    config["interaction"] = False
+interaction = bool(config["interaction"])
+
+if( interaction is True ):
+    print(" * Interaction mode selected")
+    if "interaction_name" not in config.keys():
+        sys.exit("config.yaml does not contain interaction_name value")
+
+if(interaction is True):
+    interaction_name = config["interaction_name"]
+    #interaction_file = config["interaction_file"]
+    #interaction_file_list = [str(i) for i in interaction_file]
+    #interaction_dict = dict(zip(interaction_name, interaction_file_list))
+
+CHROM = subprocess.run(["tabix","-l", VCF], stdout=subprocess.PIPE).stdout.decode('utf-8').splitlines()
+
+outFolder = "results/" + dataCode + "/"
+prefix = outFolder + dataCode
+
+###################################################################################################
+onstart:
+    import pprint
+    # create dir for log on cluster mode
+    shell("mkdir -p clusterlog/")
+    print("----------------------------------------------------------------------------------------------------------")
+    print(" * Snakemake QTL-mapping pipeline (suez version) *")
+    print(" Ricardo Vialle; David Knowles; Jack Humphrey")
+    print(" Jun2021")
+    print("----------------------------------------------------------------------------------------------------------")
+    print(" * Data code is : %s " % dataCode)
+    print(" * Mode selected is: %s" % mode)
+    print("----------------------------------------------------------------------------------------------------------")
+    print("Parameters:")
+    for k,v in sorted(config.items()):
+        print(" - " + k + ": ", end='')
+        pprint.pprint(v)
+    print("----------------------------------------------------------------------------------------------------------")
+    print("")
+
+def onend(msg, log):
+    import os
+    #Remove clusterlog folder (if exists and empty)
+    shell('if [ -d "clusterlog/" ]; then if [ ! "$(ls -A clusterlog/)" ]; then rm -rf clusterlog/; fi; fi')
+    shell('mkdir -p {outFolder}/log')
+    from datetime import datetime
+    dtnow = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    log_file = outFolder + "/log/suez_" + dtnow + ".log"
+    shell("cp {log} {log_file}")
+    print("")
+    print("----------------------------------------------------------------------------------------------------------")
+    print(msg)
+    print("Please check the main log file for more information:")
+    print("\t" + os.path.abspath(log_file))
+    print("For a detailed running output report with execution time for each rule run againg with the flag --report")
+    print("----------------------------------------------------------------------------------------------------------")
+    print("")
+
+onsuccess:
+    onend("suez finished successfuly", log)
+
+onerror:
+    onend("An error has occured.", log)
+
+###################################################################################################
+rule all:
+    input:
+        #final_output
+        expand(prefix + ".{interaction_id}.harmonized.RData", interaction_id = interaction_name),
+        expand(outFolder + "{interaction_id}/{dataCode}.cis_interaction_qtl.tsv.gz.tbi", interaction_id = interaction_name, dataCode = dataCode)
+
+rule processGTF:
+    input:
+        GTF
+    output:
+        outFolder + "gencode_genes_annotation.txt"
+    params:
+        script = SNAKEDIR + "/scripts/process_gtf.R"
+    shell:
+        "Rscript {params.script} {input} {output}"
+
+# extract the needed samples from the VCF 
+rule getParticipants:
+    input:
+        txt = sample_key
+    output:
+        txt = prefix + "_participants.txt"
+    run:
+        sk = pd.read_csv(input.txt, sep = "\t")
+        participants = sk[["participant_id"]]
+        participants.to_csv(output.txt, index = False, header = False, sep = "\t")
+
+rule VCFtoPLINK:
+    input:
+        vcf = VCFstem + ".vcf.gz",
+        participants = prefix + "_participants.txt"
+    output:
+        prefix + "_genotypes.afreq"
+    params:
+        stem = prefix + "_genotypes"
+    conda:
+        SNAKEDIR + "envs/plink2.yaml" 
+    shell:
+        "plink2 --make-bed "
+        "--output-chr chrM "
+        "--max-alleles 2 "
+        "--keep {input.participants} "
+        "--maf 0.01 "
+        "--freq "
+        "--allow-extra-chr "
+        "--max-maf 0.9975 "
+        "--vcf {input.vcf} "
+        "--out {params.stem} "
+
+rule generateGRM:
+    input:
+        genotypes = prefix + "_genotypes.afreq"
+    output:
+        prefix + "_genotypes.grm.bin"
+    params:
+        stem = prefix + "_genotypes"
+    conda:
+        SNAKEDIR + "envs/plink2.yaml" 
+    shell:
+        "plink2 --bfile {params.stem} "
+        "--read-freq {input.genotypes} "
+        "--make-grm-bin -out {params.stem}"
+
+rule harmonizeData:
+    input:
+        gtf_anno = outFolder + "gencode_genes_annotation.txt",
+        grm = prefix + "_genotypes.grm.bin"
+    output:
+        prefix + ".{interaction_id}.harmonized.RData"
+    params:
+        script = SNAKEDIR + "/scripts/harmonize_input.R",
+        stem = prefix + "_genotypes",
+        expression_matrix = countMatrixRData,
+        sample_key = sample_key,
+        metadata = metadataRData,
+        gtf = outFolder + "gencode_genes_annotation.txt",
+        interaction = lambda wcs: wcs.interaction_id
+    shell:
+        "ml {R_VERSION}; "
+        " Rscript {params.script} "
+        "--sample_key {params.sample_key} "
+        "--metadata {params.metadata} "
+        "--grm {params.stem} "
+        "--expression_matrix {params.expression_matrix} "
+        "--gtf {params.gtf} "
+        "--interaction {params.interaction} "
+        "--out_folder {outFolder} "
+        "--prefix {dataCode}.{params.interaction}"
+
+rule runSuez:
+    input:
+        data_sub = expand(prefix + ".{interaction_id}.harmonized.RData", interaction_id = interaction_name),
+        gtf_anno = outFolder + "gencode_genes_annotation.txt",
+        grm = prefix + "_genotypes.grm.bin"
+    output:
+        outdir = directory(outFolder + "{interaction_id}/output_{chunk}"),
+        outdir_file = outFolder + "{interaction_id}/output_{chunk}/all_qtl.txt.gz"
+    params:
+        stem = prefix + "_genotypes",
+        expression_matrix = countMatrixRData,
+        sample_key = sample_key,
+        metadata = metadataRData,
+        vcf = VCF,
+        gtf = outFolder + "gencode_genes_annotation.txt",
+        cisdist = cisDist,
+        interaction = lambda wcs: wcs.interaction_id,
+        script = SNAKEDIR + "/scripts/suez_qtl.R"
+    conda:
+        SNAKEDIR + "envs/plink2.yaml" 
+    shell:
+        "ml {R_VERSION}; "
+        "Rscript {params.script} {wildcards.chunk} {params.interaction} "
+        "--expression_matrix {params.expression_matrix} "
+        "--metadata {params.metadata} "
+        "--vcf {params.vcf} "
+        "--sample_key {params.sample_key} "
+        "--cisdist '{params.cisdist}' "
+        "--gtf {params.gtf} "
+        "--grm {params.stem} "
+        "--out_dir {output.outdir}"
+
+rule get_variant_positions:
+    input:
+        VCF
+    output:
+        outFolder + "vcf_pos.txt.gz"
+    conda:
+        SNAKEDIR + "envs/bcftools.yaml" 
+    shell:
+        "bcftools query -f '%CHROM\\t%POS\\t%ID\\n' {input} | bgzip -c > {output}"
+
+rule mergeResult:
+    input:
+        outdir_files = expand( outFolder + "{interaction_id}/output_{chunk}/all_qtl.txt.gz", chunk = chunks, interaction_id = interaction_name ),
+        vcf_pos = outFolder + "vcf_pos.txt.gz",
+        gtf_annot = outFolder + "gencode_genes_annotation.txt"
+    output:
+        nominal_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl_nominal.tsv",
+        geno_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl.tsv",
+        interaction_res = outFolder + "{interaction_id}/{dataCode}.cis_interaction_qtl.tsv"
+    params:
+        script = SNAKEDIR + "/scripts/merge_results.R"
+    shell:
+        " ml {R_VERSION}; "
+        " Rscript {params.script} --vcf_pos {input.vcf_pos} --gtf_annot {input.gtf_annot} --out_folder {outFolder}/{wildcards.interaction_id} --prefix {dataCode} --expected_chunks {NUM_CHUNK}"
+
+rule compress_and_tabix_results:
+    input:
+        nominal_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl_nominal.tsv",
+        geno_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl.tsv",
+        interaction_res = outFolder + "{interaction_id}/{dataCode}.cis_interaction_qtl.tsv"
+    output:
+        nominal_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl_nominal.tsv.gz.tbi",
+        geno_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl.tsv.gz.tbi",
+        interaction_res = outFolder + "{interaction_id}/{dataCode}.cis_interaction_qtl.tsv.gz.tbi"
+    conda:
+        SNAKEDIR + "envs/bcftools.yaml" 
+    shell:
+        "bgzip -c {input.nominal_res} > {input.nominal_res}.gz; "
+        "bgzip -c {input.geno_res} > {input.geno_res}.gz; "
+        "bgzip -c {input.interaction_res} > {input.interaction_res}.gz; "
+        "tabix -f -S 1 -s 1 -b 2 -e 2 {input.nominal_res}.gz; "
+        "tabix -f -S 1 -s 1 -b 2 -e 2 {input.geno_res}.gz; "
+        "tabix -f -S 1 -s 1 -b 2 -e 2 {input.interaction_res}.gz; "
