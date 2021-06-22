@@ -1,0 +1,6 @@
+results*
+z_*
+README.html
+.snakemake
+.DS_Store
+.Rhistory
