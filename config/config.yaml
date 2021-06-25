@@ -1,17 +1,37 @@
-dataCode: example
+# ID to identify the run folder and result files
+dataCode: example 
 
+# Tab separated file with two columns named: sample_id, participant_id
+# Each row is a sample (participant_id can be repeated, in case of multiple samples for the same donor)
 sampleKey: "example/sampleKey.txt"
 
+# R data.frame matrix with gene expression in TPM for each sample (indicated in the sampleKey/sample_id column)
+countMatrixRData: "example/genes_tpm.rds"
+
+# Table with metadata information for each sample. Must have two columns named: sample_id,  participant_id. IDs will be used for matching with the other tables.
+metadataRData: "example/metadata.txt"
+
+# Flag to run interaction eQTL (for now it needs to be True)
 interaction: True
+# Column names in metadata to be used as interaction term (samples with NA will be droped)
 interaction_name:
     - 'case_control_other_latest'
     #- 'neutrophils_percent_z'
     #- 'visit_month'
 
-countMatrixRData: "example/genes_tpm.rds"
-metadataRData: "example/metadata.txt"
-
+# VCF file with IDs corresponding to sampleKey/participant_id column. Incompatible IDs will not be included.
 VCF: "example/genotypes.vcf.gz"
+
+# Gene annotation file for collect gene positions (use the same version as the one used in the RNAseq mapping)
 GTF: "ref/gencode.v29.annotation.gtf.gz"
 
+# For now only eQTL. Maybe in the future we can add other models. 
 mode: "eQTL"
+
+cisDist: 100000 # max distance from TSS to look for SNPs
+
+# R version used on cluster (ml R_VERSION)
+R_VERSION: "R/4.0.3"
+
+# Number of chunks to split processing genes
+NUM_CHUNK: 200

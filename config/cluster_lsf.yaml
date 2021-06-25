@@ -1,0 +1,13 @@
+### cluster config 
+
+__default__:
+  project: acc_ad-omics
+  queue: premium
+  cores: 1
+  nodes: 1
+  mem: 32000
+  time: '144:00'
+  name: $(basename $(pwd)).{rule}.{wildcards}
+  output: clusterlog/{rule}.{wildcards}.stdout
+  error: clusterlog/{rule}.{wildcards}.stderr
+

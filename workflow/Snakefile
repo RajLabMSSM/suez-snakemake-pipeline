@@ -5,19 +5,43 @@ import pathlib
 import pandas as pd
 from snakemake.io import *
 
+version="Jun2021"
+
 ###################################################################################################
-## Define global variables
+## Check input
 ###################################################################################################
-# Some hardcoded stuff for now
-R_VERSION = "R/4.0.3"
-cisDist = 100000 # max distance from TSS to look for SNPs
-NUM_CHUNK = 40
-chunks = [str(x) for x in range(1,NUM_CHUNK+1)]
+if( "workdir" not in config ):
+    print("No working directory defined on the configuration file.")
+    print("Using current folder (please make sure paths to files are reachable).")
+    workdir: os.getcwd()
+else:
+    workdir: config["workdir"]
 
 # Set snakemake main workdir variable. 
 SNAKEDIR = os.path.dirname(workflow.snakefile) + "/"
 
-#shell.prefix('ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate QTL-pipeline; ml {R_VERSION};')
+###################################################################################################
+## Define global variables
+###################################################################################################
+# Setting defaults for missing info in the config file
+if( "R_VERSION" not in config ):
+    R_VERSION = "R/4.0.3"
+else:
+    R_VERSION = config["R_VERSION"]
+
+if( "cisDist" not in config ):
+    cisDist = 100000 # max distance from TSS to look for SNPs
+else:
+    cisDist = config["cisDist"]
+
+if( "NUM_CHUNK" not in config ):
+    NUM_CHUNK = 200
+else:
+    NUM_CHUNK = config["NUM_CHUNK"]
+
+chunks = [str(x) for x in range(1,NUM_CHUNK+1)]
+
+#shell.prefix('ml anaconda3/2020.11; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate QTL-pipeline; ml {R_VERSION};')
 
 dataCode = config["dataCode"]
 mode = config["mode"]
@@ -60,7 +84,7 @@ onstart:
     print("----------------------------------------------------------------------------------------------------------")
     print(" * Snakemake QTL-mapping pipeline (suez version) *")
     print(" Ricardo Vialle; David Knowles; Jack Humphrey")
-    print(" Jun2021")
+    print(" %s" % version)
     print("----------------------------------------------------------------------------------------------------------")
     print(" * Data code is : %s " % dataCode)
     print(" * Mode selected is: %s" % mode)
@@ -109,9 +133,9 @@ rule processGTF:
     output:
         outFolder + "gencode_genes_annotation.txt"
     params:
-        script = SNAKEDIR + "/scripts/process_gtf.R"
+        script = SNAKEDIR + "scripts/process_gtf.R"
     shell:
-        "Rscript {params.script} {input} {output}"
+        "ml {R_VERSION}; Rscript {params.script} {input} {output}"
 
 # extract the needed samples from the VCF 
 rule getParticipants:
@@ -150,7 +174,7 @@ rule generateGRM:
     input:
         genotypes = prefix + "_genotypes.afreq"
     output:
-        prefix + "_genotypes.grm.bin"
+        prefix + "_genotypes.grm"
     params:
         stem = prefix + "_genotypes"
     conda:
@@ -158,12 +182,12 @@ rule generateGRM:
     shell:
         "plink2 --bfile {params.stem} "
         "--read-freq {input.genotypes} "
-        "--make-grm-bin -out {params.stem}"
+        "--make-grm-list -out {params.stem}"
 
 rule harmonizeData:
     input:
         gtf_anno = outFolder + "gencode_genes_annotation.txt",
-        grm = prefix + "_genotypes.grm.bin"
+        grm = prefix + "_genotypes.grm"
     output:
         prefix + ".{interaction_id}.harmonized.RData"
     params:
@@ -190,7 +214,7 @@ rule runSuez:
     input:
         data_sub = expand(prefix + ".{interaction_id}.harmonized.RData", interaction_id = interaction_name),
         gtf_anno = outFolder + "gencode_genes_annotation.txt",
-        grm = prefix + "_genotypes.grm.bin"
+        grm = prefix + "_genotypes.grm"
     output:
         outdir = directory(outFolder + "{interaction_id}/output_{chunk}"),
         outdir_file = outFolder + "{interaction_id}/output_{chunk}/all_qtl.txt.gz"
@@ -216,6 +240,8 @@ rule runSuez:
         "--cisdist '{params.cisdist}' "
         "--gtf {params.gtf} "
         "--grm {params.stem} "
+        "--num_jobs {NUM_CHUNK} "
+        "--threads 1 "
         "--out_dir {output.outdir}"
 
 rule get_variant_positions:

@@ -28,46 +28,33 @@ argv = if (interactive())
                             "--out_folder","results/example/",
                             "--prefix","example")) else parse_args(ap)
 
+argv = if (interactive()) 
+    parse_args(ap, argv = c("--sample_key","/hpc/users/viallr01/ad-omics/amp_pd/suezPD/z_data_mic/migasti_lps_sample_key.tsv",
+                            "--metadata","/hpc/users/viallr01/ad-omics/amp_pd/suezPD/z_data_mic/migasti_lps_metadata.tsv",
+                            "--grm","results/LPS_run1/LPS_run1_genotypes",
+                            "--expression_matrix","/hpc/users/viallr01/ad-omics/amp_pd/suezPD/z_data_mic/genes_tpm.rds",
+                            "--gtf","results/LPS_run1/gencode_genes_annotation.txt",
+                            "--interaction","LPS",
+                            "--out_folder","results/LPS_run1/",
+                            "--prefix","LPS_run1.LPS")) else parse_args(ap)
+
 print(argv)
 
 ## ----------------------------------------------------------------------------------------------------------------------------------------------------
+#rootname=argv$grm
 readGRM <- function(rootname){
-    bin.file.name <- paste(rootname, ".grm.bin", sep="")
-    n.file.name <- paste(rootname, ".grm.N.bin", sep="")
-    id.file.name <- paste(rootname, ".grm.id", sep="")
+    grm.file = read.table(paste0(rootname, ".grm"))
+    grm.id.file = read.table(paste0(rootname, ".grm.id"))
     
-    cat("Reading IDs\n")
-    id <- read.table(id.file.name)
-    n <- dim(id)[1]
-    cat("Reading GRM\n")
-    bin.file <- file(bin.file.name, "rb")
-    grm <- readBin(bin.file, n=n*(n+1)/2, what=numeric(0), size=4)
-    close(bin.file)
-    cat("Reading N\n")
-    n.file <- file(n.file.name, "rb")
-    N <- readBin(n.file, n=n*(n+1)/2, what=numeric(0), size=4)
-    close(n.file)
-    
-    cat("Creating data frame")
-    l <- list()
-    for(i in 1:n)
-    {
-        l[[i]] <- 1:i
-    }
-    col1 <- rep(1:n, 1:n)
-    col2 <- unlist(l)
-    grm <- data.frame(id1=col1, id2=col2, N=N, grm=grm)
-    
-    grm_mat <- matrix(NA, nrow = n, ncol = n)
-    for(i in 1:nrow(grm)){
-        grm_mat[grm$id1[i],grm$id2[i]] <- grm$grm[i]
-    }
-    dimnames(grm_mat) = list(id$V2, id$V2)
+    grm.mat = grm.file %>% pivot_wider(2, names_from = 1, values_from = 4) %>% dplyr::select(-1) %>% as.data.frame()
+    grm.mat[lower.tri(grm.mat)] <- t(grm.mat)[lower.tri(grm.mat)]
+    rownames(grm.mat) = grm.id.file$V2
+    colnames(grm.mat) = grm.id.file$V2    
     
     ret <- list()
-    ret$grm <- grm
-    ret$grm_mat <- grm_mat
-    ret$id <- id
+    ret$grm <- grm.file
+    ret$grm_mat <- grm.mat
+    ret$id <- grm.id.file
     return(ret)
 }
 

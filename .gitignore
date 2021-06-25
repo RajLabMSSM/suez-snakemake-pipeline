@@ -2,5 +2,6 @@ results*
 z_*
 README.html
 .snakemake
+clusterlog
 .DS_Store
 .Rhistory
