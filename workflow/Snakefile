@@ -17,7 +17,7 @@ chunks = [str(x) for x in range(1,NUM_CHUNK+1)]
 # Set snakemake main workdir variable. 
 SNAKEDIR = os.path.dirname(workflow.snakefile) + "/"
 
-#shell.prefix('ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate QTL-pipeline; ml {R_VERSION};')
+shell.prefix('ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate snakemake;ml plink2;')
 
 dataCode = config["dataCode"]
 mode = config["mode"]
@@ -47,7 +47,7 @@ if(interaction is True):
     #interaction_file_list = [str(i) for i in interaction_file]
     #interaction_dict = dict(zip(interaction_name, interaction_file_list))
 
-CHROM = subprocess.run(["tabix","-l", VCF], stdout=subprocess.PIPE).stdout.decode('utf-8').splitlines()
+#CHROM = subprocess.run(["ml tabix; tabix","-l", VCF], stdout=subprocess.PIPE).stdout.decode('utf-8').splitlines()
 
 outFolder = "results/" + dataCode + "/"
 prefix = outFolder + dataCode
@@ -111,6 +111,7 @@ rule processGTF:
     params:
         script = SNAKEDIR + "/scripts/process_gtf.R"
     shell:
+        "ml R/4.0.3/;"
         "Rscript {params.script} {input} {output}"
 
 # extract the needed samples from the VCF 
@@ -226,6 +227,7 @@ rule get_variant_positions:
     conda:
         SNAKEDIR + "envs/bcftools.yaml" 
     shell:
+        "ml bcftools;"
         "bcftools query -f '%CHROM\\t%POS\\t%ID\\n' {input} | bgzip -c > {output}"
 
 rule mergeResult:
@@ -255,6 +257,7 @@ rule compress_and_tabix_results:
     conda:
         SNAKEDIR + "envs/bcftools.yaml" 
     shell:
+        "ml tabix;"
         "bgzip -c {input.nominal_res} > {input.nominal_res}.gz; "
         "bgzip -c {input.geno_res} > {input.geno_res}.gz; "
         "bgzip -c {input.interaction_res} > {input.interaction_res}.gz; "

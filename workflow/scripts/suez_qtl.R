@@ -1,5 +1,4 @@
 shhh <- suppressPackageStartupMessages # It's a library, so shhh!
-
 ## -------------------------------------------------------------------------------------------------------------------------------------------------
 ## Data prep for PPMI (Hard coded -- remove in the future)
 ## -------------------------------------------------------------------------------------------------------------------------------------------------
@@ -216,10 +215,12 @@ registerDoMC(argv$threads)
 tab = TabixFile(argv$vcf, argv$tabix)
 ## Load relationship matrix ------------------------------------------------------------------------------------------------------------------------
 print("### Loading GRM...")
-grm_obj <- readGRM(argv$grm)
-grm_ids = grm_obj$id
-grm = grm_obj$grm_mat
-grm[upper.tri(grm)] <- t(grm)[upper.tri(grm)] 
+#grm_obj <- readGRM(argv$grm)
+#grm_ids = grm_obj$id
+#grm = grm_obj$grm_mat
+##grm[upper.tri(grm)] <- t(grm)[upper.tri(grm)] 
+
+grm <- OmicKriging::read_GRMBin(paste0(argv$grm, ".grm") )
 diag(grm) = 1 # is this correct? 
 
 print(paste0(nrow(grm), " participants included."))

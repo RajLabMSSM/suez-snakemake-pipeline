@@ -56,6 +56,11 @@ readGRM <- function(rootname){
     }
     col1 <- rep(1:n, 1:n)
     col2 <- unlist(l)
+    print(length(col1) )
+    print(length(col2) )
+    print(length(N) )
+    print(length(grm) )
+    save.image("debug.RData")
     grm <- data.frame(id1=col1, id2=col2, N=N, grm=grm)
     
     grm_mat <- matrix(NA, nrow = n, ncol = n)
@@ -99,11 +104,14 @@ sample_key = suppressMessages(read_tsv(argv$sample_key))
 cat(paste0("\n",length(unique(sample_key$sample_id)), " unique samples and ", length(unique(sample_key$participant_id)), " unique participants."))
 
 ## 3. Load relationship matrix -----------------------------------------------------------------------------------------------------------------------
-cat("\n\n### Loading GRM...")
-grm_obj <- readGRM(argv$grm)
-grm_ids = grm_obj$id
-grm = grm_obj$grm_mat
-grm[upper.tri(grm)] <- t(grm)[upper.tri(grm)] 
+#cat("\n\n### Loading GRM...")
+#grm_obj <- readGRM(argv$grm)
+#grm_ids = grm_obj$id
+#grm = grm_obj$grm_mat
+#grm[upper.tri(grm)] <- t(grm)[upper.tri(grm)] 
+
+## bug in readGRM function 
+grm <- OmicKriging::read_GRMBin(paste0(argv$grm, ".grm") )
 diag(grm) = 1 # is this correct? 
 
 cat(paste0("\n",nrow(grm), " participants included."))
