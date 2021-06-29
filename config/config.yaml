@@ -25,13 +25,13 @@ VCF: "example/genotypes.vcf.gz"
 # Gene annotation file for collect gene positions (use the same version as the one used in the RNAseq mapping)
 GTF: "ref/gencode.v29.annotation.gtf.gz"
 
-# For now only eQTL. Maybe in the future we can add other models. 
+# For now only eQTL. Maybe in the future we can add other modes. 
 mode: "eQTL"
 
-cisDist: 100000 # max distance from TSS to look for SNPs
+cisDist: 10000 # max distance from TSS to look for SNPs
 
 # R version used on cluster (ml R_VERSION)
 R_VERSION: "R/4.0.3"
 
 # Number of chunks to split processing genes
-NUM_CHUNK: 200
+NUM_CHUNK: 50

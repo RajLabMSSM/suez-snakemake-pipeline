@@ -124,7 +124,6 @@ onerror:
 rule all:
     input:
         #final_output
-        expand(prefix + ".{interaction_id}.harmonized.RData", interaction_id = interaction_name),
         expand(outFolder + "{interaction_id}/{dataCode}.cis_interaction_qtl.tsv.gz.tbi", interaction_id = interaction_name, dataCode = dataCode)
 
 rule processGTF:
@@ -186,33 +185,38 @@ rule generateGRM:
 
 rule harmonizeData:
     input:
+        vcf = VCFstem + ".vcf.gz",
         gtf_anno = outFolder + "gencode_genes_annotation.txt",
         grm = prefix + "_genotypes.grm"
     output:
-        prefix + ".{interaction_id}.harmonized.RData"
+        outFolder + "{interaction_id}/harmonized.RData"
     params:
         script = SNAKEDIR + "/scripts/harmonize_input.R",
+        prefix = outFolder + "{interaction_id}",
         stem = prefix + "_genotypes",
         expression_matrix = countMatrixRData,
         sample_key = sample_key,
         metadata = metadataRData,
         gtf = outFolder + "gencode_genes_annotation.txt",
         interaction = lambda wcs: wcs.interaction_id
+    conda:
+        SNAKEDIR + "envs/bcftools.yaml" 
     shell:
         "ml {R_VERSION}; "
         " Rscript {params.script} "
         "--sample_key {params.sample_key} "
         "--metadata {params.metadata} "
+        "--vcf {input.vcf} "
         "--grm {params.stem} "
         "--expression_matrix {params.expression_matrix} "
         "--gtf {params.gtf} "
         "--interaction {params.interaction} "
         "--out_folder {outFolder} "
-        "--prefix {dataCode}.{params.interaction}"
+        "--prefix {params.prefix}"
 
 rule runSuez:
     input:
-        data_sub = expand(prefix + ".{interaction_id}.harmonized.RData", interaction_id = interaction_name),
+        data_harmonized = outFolder + "{interaction_id}/harmonized.RData",
         gtf_anno = outFolder + "gencode_genes_annotation.txt",
         grm = prefix + "_genotypes.grm"
     output:
@@ -220,11 +224,7 @@ rule runSuez:
         outdir_file = outFolder + "{interaction_id}/output_{chunk}/all_qtl.txt.gz"
     params:
         stem = prefix + "_genotypes",
-        expression_matrix = countMatrixRData,
-        sample_key = sample_key,
-        metadata = metadataRData,
         vcf = VCF,
-        gtf = outFolder + "gencode_genes_annotation.txt",
         cisdist = cisDist,
         interaction = lambda wcs: wcs.interaction_id,
         script = SNAKEDIR + "/scripts/suez_qtl.R"
@@ -233,13 +233,9 @@ rule runSuez:
     shell:
         "ml {R_VERSION}; "
         "Rscript {params.script} {wildcards.chunk} {params.interaction} "
-        "--expression_matrix {params.expression_matrix} "
-        "--metadata {params.metadata} "
+        "--harmonizedRData {input.data_harmonized} "
         "--vcf {params.vcf} "
-        "--sample_key {params.sample_key} "
         "--cisdist '{params.cisdist}' "
-        "--gtf {params.gtf} "
-        "--grm {params.stem} "
         "--num_jobs {NUM_CHUNK} "
         "--threads 1 "
         "--out_dir {output.outdir}"

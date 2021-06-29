@@ -5,12 +5,14 @@ shhh <- suppressPackageStartupMessages # It's a library, so shhh!
 shhh(require(tidyverse))
 shhh(require(argparser))
 shhh(require(S4Vectors))
+shhh(require(Rsamtools))
 
 ## ----------------------------------------------------------------------------------------------------------------------------------------------------
 
 ap = arg_parser(description = "Harmonize data inputs. Match samples/genes across input files.", name = "harmonize_input.R")
 ap = add_argument(ap, "--sample_key", help = " ", default = "sample_key.txt")
 ap = add_argument(ap, "--metadata", help = " ", default = "metadata.txt")
+ap = add_argument(ap, "--vcf", help = " ", default = "genotypes.vcf.gz")
 ap = add_argument(ap, "--grm", help = "Genetic relatedness matrix, calculated by plink. (e.g. plink2 --bfile plink_file --make-grm-bin -out prefix).")
 ap = add_argument(ap, "--expression_matrix", help = "Gene expression matrix rdf file (in TPM).", default = "genes_tpm.rds", type = "character")
 ap = add_argument(ap, "--gtf", help = "Processed GTF file. Run process_gtf.R first.")
@@ -38,7 +40,7 @@ argv = if (interactive())
                             "--out_folder","results/LPS_run1/",
                             "--prefix","LPS_run1.LPS")) else parse_args(ap)
 
-print(argv)
+#print(argv)
 
 ## ----------------------------------------------------------------------------------------------------------------------------------------------------
 #rootname=argv$grm
@@ -129,17 +131,22 @@ ge = genes_tpm_exp[,samples]
 
 cat(paste0("\n",length(samples), " samples and ", length(individuals), " individuals are matching all input data."))
 
-## 7. Filter genes by GTF ----------------------------------------------------------------------------------------------------------------------------
-genes_to_keep = intersect.Vector( rownames(ge), gtf$gene_id )
+## 7. Filter GTF by VCF chrom ----------------------------------------------------------------------------------------------------------------------
+chr_in_vcf = system(paste0("tabix -l ", argv$vcf), intern = T)
+gtf_sub = gtf[ gtf$chr %in% chr_in_vcf, ]
+cat(paste0("\n",length(unique(gtf_sub$chr)), " chromosomes intersected the GTF and the VCF provided. "))
+
+## 8. Filter genes by GTF ----------------------------------------------------------------------------------------------------------------------------
+genes_to_keep = intersect.Vector( rownames(ge), gtf_sub$gene_id )
 ge_sub = ge[genes_to_keep, ]
 cat(paste0("\n",length(genes_to_keep), " genes in the expression table intersected the GTF provided. Analysis will continue with that number."))
 
-## 8. Write files ------------------------------------------------------------------------------------------------------------------------------------
+## 9. Write files ------------------------------------------------------------------------------------------------------------------------------------
 cat("\n\n### Writing harmonized input files.\n\n")
 
-expression_sub = as.matrix(ge_sub)
-grm_sub = grm[meta_final$individual, meta_final$individual]
-meta_sub = as.data.frame(meta_final)
-gtf_sub = as.data.frame(gtf[match(genes_to_keep,gtf$gene_id), ])
+ge = as.matrix(ge_sub)
+grm = grm[meta_final$individual, meta_final$individual]
+meta_final = as.data.frame(meta_final)
+gtf = as.data.frame(gtf_sub[match(genes_to_keep,gtf_sub$gene_id), ])
 
-save(expression_sub,grm_sub,meta_sub,gtf_sub, file = paste0(argv$out_folder,"/", argv$prefix, ".harmonized.RData"))
+save(ge,grm,meta_final,gtf, file = paste0(argv$prefix, "/harmonized.RData"))

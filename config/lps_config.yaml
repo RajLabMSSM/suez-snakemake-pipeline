@@ -1,0 +1,18 @@
+dataCode: LPS_run1
+
+sampleKey: "z_data_mic/migasti_lps_sample_key.tsv"
+
+interaction: True
+interaction_name:
+    - 'LPS'
+
+countMatrixRData: "z_data_mic/genes_tpm.rds"
+metadataRData: "z_data_mic/migasti_lps_metadata.tsv"
+
+VCF: "z_data_mic/genotypes.vcf.gz"
+GTF: "/sc/arion/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.annotation.gtf.gz"
+
+mode: "eQTL"
+
+# Number of chunks to split processing genes
+NUM_CHUNK: 100

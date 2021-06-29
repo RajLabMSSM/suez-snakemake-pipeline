@@ -54,7 +54,7 @@ snakemake -s workflow/Snakefile --configfile $config -pr --local-cores 1 --use-c
   -u $cluster --cluster-sync "${bsub[*]}" \
   --keep-going \
   --rerun-incomplete \
-  --jobs 200 \
+  --jobs 100 \
   --restart-times 0 \
   --latency-wait 30 \
   $dryrun
