@@ -71,7 +71,6 @@ if(interaction is True):
     #interaction_file_list = [str(i) for i in interaction_file]
     #interaction_dict = dict(zip(interaction_name, interaction_file_list))
 
-CHROM = subprocess.run(["tabix","-l", VCF], stdout=subprocess.PIPE).stdout.decode('utf-8').splitlines()
 
 outFolder = "results/" + dataCode + "/"
 prefix = outFolder + dataCode
