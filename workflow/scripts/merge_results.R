@@ -60,7 +60,7 @@ res_geno <- snp_df %>%
     left_join(gtf, by = c("gene"="gene.id")) %>% 
     arrange(mixedrank(chr), pos, gene.tss, gene.start, gene.end)
 
-res_interaction1 = foreach(f = paste0(out_folder, "/output_",1:expected_chunks,"/all_qtl.interact.pval.txt.gz"), .combine = bind_rows, .errorhandling = "remove") %dopar% {
+res_interaction1 = foreach(f = paste0(out_folder, "/output_",1:expected_chunks,"_PC", num_pcs,"/all_qtl.interact.pval.txt.gz"), .combine = bind_rows, .errorhandling = "remove") %dopar% {
     dat = suppressMessages(read_tsv(f)) %>% dplyr::select(-nom_pval)
 }
 res_interaction <- snp_df %>% 
