@@ -41,6 +41,12 @@ else:
 
 chunks = [str(x) for x in range(1,NUM_CHUNK+1)]
 
+if( "num_pcs" not in config ):
+    num_pcs = [0]
+else:
+    num_pcs = config["num_pcs"]
+
+
 #shell.prefix('ml anaconda3/2020.11; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate QTL-pipeline; ml {R_VERSION};')
 
 dataCode = config["dataCode"]
@@ -70,7 +76,6 @@ if(interaction is True):
     #interaction_file = config["interaction_file"]
     #interaction_file_list = [str(i) for i in interaction_file]
     #interaction_dict = dict(zip(interaction_name, interaction_file_list))
-
 
 outFolder = "results/" + dataCode + "/"
 prefix = outFolder + dataCode
@@ -123,7 +128,7 @@ onerror:
 rule all:
     input:
         #final_output
-        expand(outFolder + "{interaction_id}/{dataCode}.cis_interaction_qtl.tsv.gz.tbi", interaction_id = interaction_name, dataCode = dataCode)
+        expand(outFolder + "{interaction_id}/{dataCode}.PC{NUMPC}.cis_interaction_qtl.tsv.gz.tbi", interaction_id = interaction_name, dataCode = dataCode, NUMPC = num_pcs)
 
 rule processGTF:
     input:
@@ -221,8 +226,8 @@ rule runSuez:
         gtf_anno = outFolder + "gencode_genes_annotation.txt",
         grm = prefix + "_genotypes.grm"
     output:
-        outdir = directory(outFolder + "{interaction_id}/output_{chunk}"),
-        outdir_file = outFolder + "{interaction_id}/output_{chunk}/all_qtl.txt.gz"
+        outdir = directory(outFolder + "{interaction_id}/output_{chunk}_PC{NUMPC}"),
+        outdir_file = outFolder + "{interaction_id}/output_{chunk}_PC{NUMPC}/all_qtl.txt.gz"
     params:
         stem = prefix + "_genotypes",
         vcf = VCF,
@@ -239,7 +244,8 @@ rule runSuez:
         "--cisdist '{params.cisdist}' "
         "--num_jobs {NUM_CHUNK} "
         "--threads 1 "
-        "--out_dir {output.outdir}"
+        "--out_dir {output.outdir} "
+        "--ge_PCs_to_remove {wildcards.NUMPC} "
 
 rule get_variant_positions:
     input:
@@ -253,28 +259,28 @@ rule get_variant_positions:
 
 rule mergeResult:
     input:
-        outdir_files = expand( outFolder + "{interaction_id}/output_{chunk}/all_qtl.txt.gz", chunk = chunks, interaction_id = interaction_name ),
+        outdir_files = expand( outFolder + "{interaction_id}/output_{chunk}_PC{NUMPC}/all_qtl.txt.gz", chunk = chunks, interaction_id = interaction_name, NUMPC = num_pcs ),
         vcf_pos = outFolder + "vcf_pos.txt.gz",
         gtf_annot = outFolder + "gencode_genes_annotation.txt"
     output:
-        nominal_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl_nominal.tsv",
-        geno_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl.tsv",
-        interaction_res = outFolder + "{interaction_id}/{dataCode}.cis_interaction_qtl.tsv"
+        nominal_res = outFolder + "{interaction_id}/{dataCode}.PC{NUMPC}.cis_qtl_nominal.tsv",
+        geno_res = outFolder + "{interaction_id}/{dataCode}.PC{NUMPC}.cis_qtl.tsv",
+        interaction_res = outFolder + "{interaction_id}/{dataCode}.PC{NUMPC}.cis_interaction_qtl.tsv"
     params:
         script = SNAKEDIR + "/scripts/merge_results.R"
     shell:
         " ml {R_VERSION}; "
-        " Rscript {params.script} --vcf_pos {input.vcf_pos} --gtf_annot {input.gtf_annot} --out_folder {outFolder}/{wildcards.interaction_id} --prefix {dataCode} --expected_chunks {NUM_CHUNK}"
+        " Rscript {params.script} --vcf_pos {input.vcf_pos} --gtf_annot {input.gtf_annot} --out_folder {outFolder}/{wildcards.interaction_id} --prefix {dataCode}.PC{wildcards.NUMPC} --expected_chunks {NUM_CHUNK}"
 
 rule compress_and_tabix_results:
     input:
-        nominal_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl_nominal.tsv",
-        geno_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl.tsv",
-        interaction_res = outFolder + "{interaction_id}/{dataCode}.cis_interaction_qtl.tsv"
+        nominal_res = outFolder + "{interaction_id}/{dataCode}.PC{NUMPC}.cis_qtl_nominal.tsv",
+        geno_res = outFolder + "{interaction_id}/{dataCode}.PC{NUMPC}.cis_qtl.tsv",
+        interaction_res = outFolder + "{interaction_id}/{dataCode}.PC{NUMPC}.cis_interaction_qtl.tsv"
     output:
-        nominal_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl_nominal.tsv.gz.tbi",
-        geno_res = outFolder + "{interaction_id}/{dataCode}.cis_qtl.tsv.gz.tbi",
-        interaction_res = outFolder + "{interaction_id}/{dataCode}.cis_interaction_qtl.tsv.gz.tbi"
+        nominal_res = outFolder + "{interaction_id}/{dataCode}.PC{NUMPC}.cis_qtl_nominal.tsv.gz.tbi",
+        geno_res = outFolder + "{interaction_id}/{dataCode}.PC{NUMPC}.cis_qtl.tsv.gz.tbi",
+        interaction_res = outFolder + "{interaction_id}/{dataCode}.PC{NUMPC}.cis_interaction_qtl.tsv.gz.tbi"
     conda:
         SNAKEDIR + "envs/bcftools.yaml" 
     shell:

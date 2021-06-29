@@ -97,17 +97,22 @@ print(paste0(length(samples), " samples and ", length(individuals), " individual
 print(paste0(nrow(ge_norm), " phenotypes (genes) with avg. TPM > 1 in ", ncol(ge_norm), " samples."))
 
 ## Regress covariates ------------------------------------------------------------------------------------------------------------------------------
-X = model.matrix( ~ condition, data = meta_final)
 
-b = solve( t(X) %*% X, t(X) %*% t(ge_norm) )
-resi = as.matrix(ge_norm - t(X %*% b))
+# if 0 PCs requested then skip this
+if( argv$ge_PCs_to_remove > 0 ){
+    X = model.matrix( ~ condition, data = meta_final)
 
-svd_ge = irlba(resi, argv$ge_PCs_to_remove)
+    b = solve( t(X) %*% X, t(X) %*% t(ge_norm) )
+    resi = as.matrix(ge_norm - t(X %*% b))
 
-recons = svd_ge$u %*% diag(svd_ge$d) %*% t(svd_ge$v)
+    svd_ge = irlba(resi, argv$ge_PCs_to_remove)
 
-ge_pc = (ge_norm - recons) # %>% t() %>% scale() %>% t() # mapping rescales anyway
+    recons = svd_ge$u %*% diag(svd_ge$d) %*% t(svd_ge$v)
 
+    ge_pc = (ge_norm - recons) # %>% t() %>% scale() %>% t() # mapping rescales anyway
+}else{
+ge_pc = ge_norm
+}
 ## run suez ----------------------------------------------------------------------------------------------------------------------------------------
 genes_ind_here = seq(argv$which_genes, nrow(ge_pc), argv$num_jobs)
 

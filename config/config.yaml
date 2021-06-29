@@ -19,6 +19,12 @@ interaction_name:
     #- 'neutrophils_percent_z'
     #- 'visit_month'
 
+# number of principal components of the phenotype matrix to control for
+num_pcs:
+    - 0
+    - 5
+    - 10
+
 # VCF file with IDs corresponding to sampleKey/participant_id column. Incompatible IDs will not be included.
 VCF: "example/genotypes.vcf.gz"
 
