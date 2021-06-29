@@ -272,7 +272,7 @@ rule mergeResult:
         script = SNAKEDIR + "/scripts/merge_results.R"
     shell:
         " ml {R_VERSION}; "
-        " Rscript {params.script} --vcf_pos {input.vcf_pos} --gtf_annot {input.gtf_annot} --out_folder {outFolder}/{wildcards.interaction_id} --prefix {dataCode}.PC{wildcards.NUMPC} --expected_chunks {NUM_CHUNK}"
+        " Rscript {params.script} --vcf_pos {input.vcf_pos} --gtf_annot {input.gtf_annot} --out_folder {outFolder}/{wildcards.interaction_id} --prefix {dataCode}.PC{wildcards.NUMPC} --expected_chunks {NUM_CHUNK} --num_pcs {wildcards.NUMPC}"
 
 rule compress_and_tabix_results:
     input:
