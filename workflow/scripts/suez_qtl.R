@@ -40,6 +40,16 @@ argv = if (interactive())
                             "--threads","1",
                             "--out_dir","results/LPS_run1/LPS/output_1")) else parse_args(ap)
 
+argv = if (interactive()) 
+    parse_args(ap, argv = c("1", 
+                            "neutrophils_percent_z",
+                            "--harmonizedRData","results/gatk_cell_count_interaction/neutrophils_percent_z/harmonized.RData",
+                            "--vcf","/sc/arion/projects/ad-omics/amp_pd/data/2020_v2release_1218/gatk_wgs_qc/output/chrAll_QCFinished_MAF0.01.vcf.gz",
+                            "--cisdist","10000",
+                            "--num_jobs","200",
+                            "--threads","1",
+                            "--out_dir","results/gatk_cell_count_interaction/neutrophils_percent_z/output_1")) else parse_args(ap)
+
 if (is.na(argv$tabix))
     argv$tabix = paste0(argv$vcf,".tbi")
 
@@ -84,15 +94,7 @@ load(argv$harmonizedRData) # expression_sub,grm_sub,meta_sub,gtf_sub2
 samples = unique(meta_final$sample_id)
 individuals = unique(meta_final$individual)
 print(paste0(length(samples), " samples and ", length(individuals), " individuals matching."))
-
-print("### Filtering genes by TPM...")
-rs = rowMeans(as.matrix(ge))
-ge = ge[rs > 5, ] # TPM < 0
-
-ge_norm = ge %>% t() 
-ge_norm = log10(ge_norm + 0.01) %>% scale() %>% t()
-
-print(paste0(nrow(ge_norm), " phenotypes (genes) with avg. TPM > 5 in ", ncol(ge_norm), " samples."))
+print(paste0(nrow(ge_norm), " phenotypes (genes) with avg. TPM > 1 in ", ncol(ge_norm), " samples."))
 
 ## Regress covariates ------------------------------------------------------------------------------------------------------------------------------
 X = model.matrix( ~ condition, data = meta_final)
@@ -106,14 +108,10 @@ recons = svd_ge$u %*% diag(svd_ge$d) %*% t(svd_ge$v)
 
 ge_pc = (ge_norm - recons) # %>% t() %>% scale() %>% t() # mapping rescales anyway
 
-## Filter genes by GTF -----------------------------------------------------------------------------------------------------------------------------
-genes_to_keep = intersect.Vector( rownames(ge_pc), gtf$gene_id )
-ge_pc_sub = ge_pc[genes_to_keep, ]
-
 ## run suez ----------------------------------------------------------------------------------------------------------------------------------------
-genes_ind_here = seq(argv$which_genes, nrow(ge_pc_sub), argv$num_jobs)
+genes_ind_here = seq(argv$which_genes, nrow(ge_pc), argv$num_jobs)
 
-all_eqtl = suppressMessages(map_interaction_qtl(input = as.matrix(ge_pc_sub[genes_ind_here,,drop=F]),
+all_eqtl = suppressMessages(map_interaction_qtl(input = as.matrix(ge_pc[genes_ind_here,,drop=F]),
                                                 genotype = tab,
                                                 genome_build = argv$build,
                                                 geneloc = as.data.frame(gtf),

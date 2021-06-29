@@ -195,6 +195,7 @@ rule harmonizeData:
         prefix = outFolder + "{interaction_id}",
         stem = prefix + "_genotypes",
         expression_matrix = countMatrixRData,
+        tpm_threshold = 1,
         sample_key = sample_key,
         metadata = metadataRData,
         gtf = outFolder + "gencode_genes_annotation.txt",
@@ -209,6 +210,7 @@ rule harmonizeData:
         "--vcf {input.vcf} "
         "--grm {params.stem} "
         "--expression_matrix {params.expression_matrix} "
+        "--tpm_threshold {params.tpm_threshold} "
         "--gtf {params.gtf} "
         "--interaction {params.interaction} "
         "--out_folder {outFolder} "

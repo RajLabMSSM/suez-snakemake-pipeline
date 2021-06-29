@@ -15,6 +15,7 @@ ap = add_argument(ap, "--metadata", help = " ", default = "metadata.txt")
 ap = add_argument(ap, "--vcf", help = " ", default = "genotypes.vcf.gz")
 ap = add_argument(ap, "--grm", help = "Genetic relatedness matrix, calculated by plink. (e.g. plink2 --bfile plink_file --make-grm-bin -out prefix).")
 ap = add_argument(ap, "--expression_matrix", help = "Gene expression matrix rdf file (in TPM).", default = "genes_tpm.rds", type = "character")
+ap = add_argument(ap, "--tpm_threshold", help = "average TPM threshold.", default = 1)
 ap = add_argument(ap, "--gtf", help = "Processed GTF file. Run process_gtf.R first.")
 ap = add_argument(ap, "--interaction", default = "case_control", help = "What to look for interactions with.")
 ap = add_argument(ap, "--out_folder", help = "Path to output results file, where chunk folder are stored")
@@ -39,6 +40,18 @@ argv = if (interactive())
                             "--interaction","LPS",
                             "--out_folder","results/LPS_run1/",
                             "--prefix","LPS_run1.LPS")) else parse_args(ap)
+
+argv = if (interactive()) 
+    parse_args(ap, argv = c("--sample_key","/sc/arion/projects/ad-omics/amp_pd/data/2020_v2release_1218/eQTL_mapping/GATK/cell_count_interaction/sampleKey.txt",
+                            "--metadata","/sc/arion/projects/ad-omics/amp_pd/data/2020_v2release_1218/processed/all_metadata_021021.txt",
+                            "--vcf","/sc/arion/projects/ad-omics/amp_pd/data/2020_v2release_1218/gatk_wgs_qc/output/chrAll_QCFinished_MAF0.01.vcf.gz",
+                            "--grm","results/gatk_cell_count_interaction/gatk_cell_count_interaction_genotypes",
+                            "--expression_matrix","/sc/arion/projects/ad-omics/amp_pd/data/2020_v2release_1218/processed/salmon_tpm.rds",
+                            "--tpm_threshold","1",
+                            "--gtf","results/gatk_cell_count_interaction/gencode_genes_annotation.txt",
+                            "--interaction","neutrophils_percent_z",
+                            "--out_folder","results/gatk_cell_count_interaction/",
+                            "--prefix","results/gatk_cell_count_interaction/neutrophils_percent_z")) else parse_args(ap)
 
 #print(argv)
 
@@ -105,7 +118,7 @@ cat(paste0("\n",nrow(genes_tpm_exp), " phenotypes (genes) and ", ncol(genes_tpm_
 
 ## 5. Load GTF ---------------------------------------------------------------------------------------------------------------------------------------
 cat("\n\n### Loading GTF...")
-gtf  = suppressMessages(read_tsv(argv$gtf)) %>% filter(! chr %in% c("chrX", "chrY") ) # only handle autosomes at least for now
+gtf  = suppressMessages(read_tsv(argv$gtf)) %>% filter(! chr %in% c("chrX", "chrY", "chrM") ) # only handle autosomes at least for now
 gtf = gtf %>% mutate(left = ifelse(strand == "+", start, end), right = left, geneid = gene_id) # just get TSS
 
 cat(paste0("\nYour GTF contains ", nrow(gtf), " phenotypes (genes)."))
@@ -139,9 +152,19 @@ cat(paste0("\n",length(unique(gtf_sub$chr)), " chromosomes intersected the GTF a
 ## 8. Filter genes by GTF ----------------------------------------------------------------------------------------------------------------------------
 genes_to_keep = intersect.Vector( rownames(ge), gtf_sub$gene_id )
 ge_sub = ge[genes_to_keep, ]
-cat(paste0("\n",length(genes_to_keep), " genes in the expression table intersected the GTF provided. Analysis will continue with that number."))
+cat(paste0("\n",length(genes_to_keep), " genes in the expression table intersected the GTF provided."))
 
-## 9. Write files ------------------------------------------------------------------------------------------------------------------------------------
+## 9. Filter genes by TPM ----------------------------------------------------------------------------------------------------------------------------
+cat("\nFiltering genes by TPM...")
+rs = rowMeans(as.matrix(ge_sub))
+ge_sub1 = ge_sub[rs > argv$tpm_threshold, ] 
+
+ge_norm = ge_sub1 %>% t() 
+ge_norm = log10(ge_norm + 0.01) %>% scale() %>% t() %>% as.matrix()
+
+cat("\n", nrow(ge_norm), " phenotypes (genes) with avg. TPM > ",argv$tpm_threshold," in ", ncol(ge_norm), " samples. Analysis will continue with that number.")
+
+## 10. Write files ------------------------------------------------------------------------------------------------------------------------------------
 cat("\n\n### Writing harmonized input files.\n\n")
 
 ge = as.matrix(ge_sub)
@@ -149,4 +172,4 @@ grm = grm[meta_final$individual, meta_final$individual]
 meta_final = as.data.frame(meta_final)
 gtf = as.data.frame(gtf_sub[match(genes_to_keep,gtf_sub$gene_id), ])
 
-save(ge,grm,meta_final,gtf, file = paste0(argv$prefix, "/harmonized.RData"))
+save(ge,ge_norm,grm,meta_final,gtf, file = paste0(argv$prefix, "/harmonized.RData"))
