@@ -155,14 +155,16 @@ ge_sub = ge[genes_to_keep, ]
 cat(paste0("\n",length(genes_to_keep), " genes in the expression table intersected the GTF provided."))
 
 ## 9. Filter genes by TPM ----------------------------------------------------------------------------------------------------------------------------
-cat("\nFiltering genes by TPM...")
-rs = rowMeans(as.matrix(ge_sub))
+cat("\nFiltering genes by median TPM...")
+#rs = rowMeans(as.matrix(ge_sub))
+rs = apply( as.matrix(ge_sub), MARGIN = 1, FUN = median )
+
 ge_sub1 = ge_sub[rs > argv$tpm_threshold, ] 
 
 ge_norm = ge_sub1 %>% t() 
 ge_norm = log10(ge_norm + 0.01) %>% scale() %>% t() %>% as.matrix()
 
-cat("\n", nrow(ge_norm), " phenotypes (genes) with avg. TPM > ",argv$tpm_threshold," in ", ncol(ge_norm), " samples. Analysis will continue with that number.")
+cat("\n", nrow(ge_norm), " phenotypes (genes) with median avg. TPM > ",argv$tpm_threshold," in ", ncol(ge_norm), " samples. Analysis will continue with that number.")
 
 ## 10. Write files ------------------------------------------------------------------------------------------------------------------------------------
 cat("\n\n### Writing harmonized input files.\n\n")

@@ -53,16 +53,17 @@ argv = if (interactive())
 if (is.na(argv$tabix))
     argv$tabix = paste0(argv$vcf,".tbi")
 
-if (is.na(argv$checkpoint_dir))
+if (is.na(argv$checkpoint_dir)){
     argv$checkpoint_dir = paste0(argv$out_dir,paste0(paste("/suez_checkpoints", 
                                                               argv$interaction, 
                                                               argv$cisdist, 
                                                               argv$maf_threshold, 
                                                               argv$normalization_approach, 
                                                               argv$permutation_approach, 
-                                                              sep = "_"), "/")) else 
-    argv$checkpoint_dir = paste0(argv$out_dir,"/",argv$checkpoint_dir)
-
+                                                              sep = "_"), "/"))
+}else{    
+argv$checkpoint_dir = paste0(argv$out_dir,"/",argv$checkpoint_dir)
+}
 #if (interactive()) .libPaths(c("/usr/local/lib64/R/library","/sc/arion/projects/ad-omics/ricardo/Rlib4"))
 if (interactive()) setwd("/sc/arion/projects/ad-omics/amp_pd/suezPD/")
 ## -------------------------------------------------------------------------------------------------------------------------------------------------
@@ -115,6 +116,7 @@ ge_pc = ge_norm
 }
 ## run suez ----------------------------------------------------------------------------------------------------------------------------------------
 genes_ind_here = seq(argv$which_genes, nrow(ge_pc), argv$num_jobs)
+
 
 all_eqtl = suppressMessages(map_interaction_qtl(input = as.matrix(ge_pc[genes_ind_here,,drop=F]),
                                                 genotype = tab,
@@ -178,6 +180,9 @@ res_geno %>% write_tsv(paste0(argv$out_dir, "/all_qtl.geno.pval.txt.gz"))
 ## interaction eqtl
 res_interact = res %>% filter(test == "interact") %>% ungroup() %>% select(-test) %>% group_by(gene) %>% dplyr::slice(1) %>% ungroup() %>% 
     mutate(nom_pval = pval, bonf_pval = pmin(bonf_pval, 1), q = p.adjust(bonf_pval, method="BH"))
-cat("eQTLs at 5% FDR:", sum(res_interact$q < 0.05), "\n")
+cat("interaction eQTLs at 5% FDR:", sum(res_interact$q < 0.05), "\n")
 
 res_interact %>% write_tsv(paste0(argv$out_dir, "/all_qtl.interact.pval.txt.gz"))
+
+# remove checkpoint dir
+unlink(argv$checkpoint_dir, recursive = TRUE)

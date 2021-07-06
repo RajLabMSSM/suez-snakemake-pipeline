@@ -41,6 +41,7 @@ else:
 
 chunks = [str(x) for x in range(1,NUM_CHUNK+1)]
 
+
 if( "num_pcs" not in config ):
     num_pcs = [0]
 else:
@@ -259,7 +260,7 @@ rule get_variant_positions:
 
 rule mergeResult:
     input:
-        outdir_files = expand( outFolder + "{interaction_id}/output_{chunk}_PC{NUMPC}/all_qtl.txt.gz", chunk = chunks, interaction_id = interaction_name, NUMPC = num_pcs ),
+        outdir_files = expand( outFolder + "{interaction_id}/output_{chunk}_PC{NUMPC}/all_qtl.txt.gz", chunk = chunks, interaction_id = interaction_name, allow_missing = True ),
         vcf_pos = outFolder + "vcf_pos.txt.gz",
         gtf_annot = outFolder + "gencode_genes_annotation.txt"
     output:
