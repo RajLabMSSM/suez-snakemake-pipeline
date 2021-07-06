@@ -23,7 +23,7 @@ interaction_name:
 num_pcs:
     - 0
     - 10
-    #- 20
+    - 20
 
 # VCF file with IDs corresponding to sampleKey/participant_id column. Incompatible IDs will not be included.
 VCF: "example/genotypes.vcf.gz"
@@ -41,3 +41,6 @@ R_VERSION: "R/4.0.3"
 
 # Number of chunks to split processing genes
 NUM_CHUNK: 50
+
+# Minor allele frequency threshold for variants
+MAF: 0.01
