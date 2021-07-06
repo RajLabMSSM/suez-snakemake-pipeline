@@ -22,8 +22,8 @@ interaction_name:
 # number of principal components of the phenotype matrix to control for
 num_pcs:
     - 0
-    - 5
     - 10
+    #- 20
 
 # VCF file with IDs corresponding to sampleKey/participant_id column. Incompatible IDs will not be included.
 VCF: "example/genotypes.vcf.gz"
