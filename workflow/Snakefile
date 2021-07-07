@@ -47,6 +47,10 @@ if( "num_pcs" not in config ):
 else:
     num_pcs = config["num_pcs"]
 
+if( "MAF" not in config ):
+    MAF = 0.01
+else:
+    MAF = config["MAF"]
 
 #shell.prefix('ml anaconda3/2020.11; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate QTL-pipeline; ml {R_VERSION};')
 
@@ -167,7 +171,7 @@ rule VCFtoPLINK:
         "--output-chr chrM "
         "--max-alleles 2 "
         "--keep {input.participants} "
-        "--maf 0.01 "
+        "--maf {MAF} "
         "--freq "
         "--allow-extra-chr "
         "--max-maf 0.9975 "
